@@ -1,13 +1,22 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
+#include <string.h>
 #include <stdbool.h>
+#include <unistd.h>
+#include <ctype.h>
+#include <errno.h>
+#include <fcntl.h>
 
-#include "recpt1core.h"
-#include "version.h"
 #include <sys/poll.h>
-#include <linux/limits.h>
 #include <linux/dvb/dmx.h>
 #include <linux/dvb/frontend.h>
+
+#include <sys/ioctl.h>
+
+#include "decoder.h"
+#include "recskapa.h"
+#include "version.h"
 
 #define SKAPA_LO (11200)
 
@@ -20,37 +29,18 @@ char chanfile[256];
 static int fefd = 0;
 static int dmxfd = 0;
 
-struct diseqc_cmd {
-    struct dvb_diseqc_master_cmd cmd;
-    uint32_t wait;
-};
-
-void diseqc_send_msg(int fd, fe_sec_voltage_t v, struct diseqc_cmd *cmd, fe_sec_tone_mode_t t)
+static int dvb_voltage_tone(int fd, int pol_vert, int tone)
 {
+    fe_sec_voltage_t v = pol_vert ? SEC_VOLTAGE_13 : SEC_VOLTAGE_18;
+    fe_sec_tone_mode_t t = tone ? SEC_TONE_ON : SEC_TONE_OFF;
+
     if (ioctl(fd, FE_SET_TONE, SEC_TONE_OFF) == -1)
         perror("FE_SET_TONE failed");
     if (ioctl(fd, FE_SET_VOLTAGE, v) == -1)
         perror("FE_SET_VOLTAGE failed");
     usleep(15 * 1000);
-    if (ioctl(fd, FE_DISEQC_SEND_MASTER_CMD, &cmd->cmd) == -1)
-        perror("FE_DISEQC_SEND_MASTER_CMD failed");
-    usleep(cmd->wait * 1000);
-    usleep(15 * 1000);
     if (ioctl(fd, FE_SET_TONE, t) == -1)
         perror("FE_SET_TONE failed");
-}
-
-static int diseqc(int secfd, int pol_vert, int tone)
-{
-    struct diseqc_cmd cmd = { {{0xe0, 0x10, 0x38, 0xf0, 0x00, 0x00}, 4}, 0 };
-
-    /**
-     * param: high nibble: reset bits, low nibble set bits,
-     * bits are: option, position, polarizaion, band
-     */
-    cmd.cmd.msg[3] = 0xf0 | ((tone ? 1 : 0) | (pol_vert ? 0 : 2));
-
-    diseqc_send_msg(secfd, pol_vert ? SEC_VOLTAGE_13 : SEC_VOLTAGE_18, &cmd, tone ? SEC_TONE_ON : SEC_TONE_OFF);
 
     return 1;
 }
@@ -89,12 +79,12 @@ int parse_time(char *rectimestr, int *recsec)
     if (!strcmp("-", rectimestr)) {
         *recsec = -1;
         return 0;
-    } else if(strchr(rectimestr, ':')) {
+    } else if (strchr(rectimestr, ':')) {
         /* colon */
         int n1, n2, n3;
         if (sscanf(rectimestr, "%d:%d:%d", &n1, &n2, &n3) == 3)
             *recsec = n1 * 3600 + n2 * 60 + n3;
-        else if(sscanf(rectimestr, "%d:%d", &n1, &n2) == 2)
+        else if (sscanf(rectimestr, "%d:%d", &n1, &n2) == 2)
             *recsec = n1 * 3600 + n2 * 60;
         else
             return 1; /* unsuccessful */
@@ -352,8 +342,8 @@ int tune(char *channel, thread_data *tdata, int dev_num)
     // Symbol Rate
     prop[3].u.data = symbol_rate;
 
-    if (!diseqc(fefd, polarity, tone)) {
-        fprintf(stderr, "Error setting diseqc\n");
+    if (!dvb_voltage_tone(fefd, polarity, tone)) {
+        fprintf(stderr, "Error setting voltage/tone\n");
         return 1;
     }
 
@@ -413,7 +403,6 @@ int tune(char *channel, thread_data *tdata, int dev_num)
     if (tdata->tfd < 0) {
         sprintf(device, "/dev/dvb/adapter%d/dvr0", dev_num);
         if ((tdata->tfd = open(device, O_RDONLY)) < 0) {
-            //      if((tdata->tfd = open(device,O_RDONLY|O_NONBLOCK)) < 0){
             fprintf(stderr, "cannot open dvr device\n");
             close(dmxfd);
             dmxfd = 0;
@@ -421,10 +410,8 @@ int tune(char *channel, thread_data *tdata, int dev_num)
         }
     }
 
-    if (!tdata->tune_persistent) {
-        /* show signal strength */
-        calc_cn();
-    }
+    /* show signal strength */
+    calc_cn();
 
     return 0; /* success */
 }

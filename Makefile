@@ -19,7 +19,7 @@ CFLAGS   = -O2 -Wall -pthread ${PCSC_CFLAGS}
 LIBS     = -lpthread -lm ${PCSC_LDLIBS}
 LDFLAGS  =
 
-OBJS  = recpt1.o decoder.o mkpath.o recpt1core.o b25/arib_std_b25.o b25/b_cas_card.o b25/multi2.o b25/ts_section_parser.o
+OBJS  = recskapa.o recskapacore.o decoder.o mkpath.o b1/arib_std_b1.o b1/b_cas_card.o b1/multi2.o b1/ts_section_parser.o
 OBJALL = $(OBJS)
 DEPEND = .deps
 

@@ -1,16 +1,14 @@
-/* -*- tab-width: 4; indent-tabs-mode: nil -*- */
-#ifndef _DECODER_H_
-#define _DECODER_H_
+#pragma once
 
 #include <stdint.h>
 #include "config.h"
 
-#include "b25/arib_std_b25.h"
-#include "b25/b_cas_card.h"
+#include "b1/arib_std_b1.h"
+#include "b1/b_cas_card.h"
 
 typedef struct decoder {
-    ARIB_STD_B25 *b25;
-    B_CAS_CARD *bcas;
+    ARIB_STD_B1 *b1;
+    B_CAS_CARD *skapa;
 } decoder;
 
 typedef struct decoder_options {
@@ -20,9 +18,7 @@ typedef struct decoder_options {
 
 /* prototypes */
 
-decoder *b25_startup(decoder_options *opt);
-int b25_shutdown(decoder *dec);
-int b25_decode(decoder *dec, ARIB_STD_B25_BUFFER *sbuf, ARIB_STD_B25_BUFFER *dbuf);
-int b25_finish(decoder *dec, ARIB_STD_B25_BUFFER *sbuf, ARIB_STD_B25_BUFFER *dbuf);
-
-#endif
+decoder *b1_startup(decoder_options *opt);
+int b1_shutdown(decoder *dec);
+int b1_decode(decoder *dec, ARIB_STD_B1_BUFFER *sbuf, ARIB_STD_B1_BUFFER *dbuf);
+int b1_finish(decoder *dec, ARIB_STD_B1_BUFFER *sbuf, ARIB_STD_B1_BUFFER *dbuf);

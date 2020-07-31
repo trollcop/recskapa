@@ -3,42 +3,42 @@
 
 #include "decoder.h"
 
-decoder *b25_startup(decoder_options *opt)
+decoder *b1_startup(decoder_options *opt)
 {
     decoder *dec = calloc(1, sizeof(decoder));
     int code;
     const char *err = NULL;
 
-    dec->b25 = create_arib_std_b25();
-    if (!dec->b25) {
-        err = "create_arib_std_b25 failed";
+    dec->b1 = create_arib_std_b1();
+    if (!dec->b1) {
+        err = "create_arib_std_b1 failed";
         goto error;
     }
 
-    code = dec->b25->set_multi2_round(dec->b25, opt->round);
+    code = dec->b1->set_multi2_round(dec->b1, opt->round);
     if (code < 0) {
         err = "set_multi2_round failed";
         goto error;
     }
 
-    code = dec->b25->set_strip(dec->b25, opt->strip);
+    code = dec->b1->set_strip(dec->b1, opt->strip);
     if (code < 0) {
         err = "set_strip failed";
         goto error;
     }
 
-    dec->bcas = create_b_cas_card();
-    if (!dec->bcas) {
+    dec->skapa = create_b_cas_card();
+    if (!dec->skapa) {
         err = "create_b_cas_card failed";
         goto error;
     }
-    code = dec->bcas->init(dec->bcas);
+    code = dec->skapa->init(dec->skapa);
     if (code < 0) {
-        err = "bcas->init failed";
+        err = "skapa->init failed";
         goto error;
     }
 
-    code = dec->b25->set_b_cas_card(dec->b25, dec->bcas);
+    code = dec->b1->set_b_cas_card(dec->b1, dec->skapa);
     if (code < 0) {
         err = "set_b_cas_card failed";
         goto error;
@@ -52,47 +52,47 @@ error:
     return NULL;
 }
 
-int b25_shutdown(decoder *dec)
+int b1_shutdown(decoder *dec)
 {
-    dec->b25->release(dec->b25);
-    dec->bcas->release(dec->bcas);
+    dec->b1->release(dec->b1);
+    dec->skapa->release(dec->skapa);
     free(dec);
 
     return 0;
 }
 
-int b25_decode(decoder *dec, ARIB_STD_B25_BUFFER *sbuf, ARIB_STD_B25_BUFFER *dbuf)
+int b1_decode(decoder *dec, ARIB_STD_B1_BUFFER *sbuf, ARIB_STD_B1_BUFFER *dbuf)
 {
     int code;
 
-    code = dec->b25->put(dec->b25, sbuf);
+    code = dec->b1->put(dec->b1, sbuf);
     if (code < 0) {
-        fprintf(stderr, "b25->put failed\n");
+        fprintf(stderr, "b1->put failed\n");
         return code;
     }
 
-    code = dec->b25->get(dec->b25, dbuf);
+    code = dec->b1->get(dec->b1, dbuf);
     if (code < 0) {
-        fprintf(stderr, "b25->get failed\n");
+        fprintf(stderr, "b1->get failed\n");
         return code;
     }
 
     return code;
 }
 
-int b25_finish(decoder *dec, ARIB_STD_B25_BUFFER *sbuf, ARIB_STD_B25_BUFFER *dbuf)
+int b1_finish(decoder *dec, ARIB_STD_B1_BUFFER *sbuf, ARIB_STD_B1_BUFFER *dbuf)
 {
     int code;
 
-    code = dec->b25->flush(dec->b25);
+    code = dec->b1->flush(dec->b1);
     if (code < 0) {
-        fprintf(stderr, "b25->flush failed\n");
+        fprintf(stderr, "b1->flush failed\n");
         return code;
     }
 
-    code = dec->b25->get(dec->b25, dbuf);
+    code = dec->b1->get(dec->b1, dbuf);
     if (code < 0) {
-        fprintf(stderr, "b25->get failed\n");
+        fprintf(stderr, "b1->get failed\n");
         return code;
     }
 
