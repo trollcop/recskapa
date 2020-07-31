@@ -25,15 +25,12 @@
 #include "recskapa.h"
 #include "mkpath.h"
 
-/* globals */
-extern bool f_exit;
-
 QUEUE_T *create_queue(size_t size)
 {
     QUEUE_T *p_queue;
-    int memsize = sizeof(QUEUE_T) + size * sizeof(BUFSZ*);
+    int memsize = sizeof(QUEUE_T) + size * sizeof(BUFSZ *);
 
-    p_queue = (QUEUE_T*)calloc(memsize, sizeof(char));
+    p_queue = (QUEUE_T *)calloc(memsize, sizeof(char));
 
     if (p_queue != NULL) {
         p_queue->size = size;

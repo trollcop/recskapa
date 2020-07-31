@@ -2,7 +2,6 @@
 
 #define MAX_QUEUE           8192
 #define MAX_READ_SIZE       (188 * 87)
-#define WRITE_SIZE          (1024 * 1024 * 2)
 
 typedef struct _BUFSZ {
     int size;
@@ -48,4 +47,3 @@ int tune(char *channel, thread_data *tdata, int dev_num);
 int close_tuner(thread_data *tdata);
 void calc_cn(void);
 int parse_time(char *rectimestr, int *recsec);
-void do_bell(int bell);

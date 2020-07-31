@@ -137,15 +137,6 @@ int parse_time(char *rectimestr, int *recsec)
     return 1; /* unsuccessful */
 }
 
-void do_bell(int bell)
-{
-    int i;
-    for (i = 0; i < bell; i++) {
-        fprintf(stderr, "\a");
-        usleep(400000);
-    }
-}
-
 /*
 
 JCSAT 3A    (128) No tone
