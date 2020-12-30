@@ -2,9 +2,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <signal.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <ctype.h>
 
 #include <errno.h>
 #include <getopt.h>
@@ -236,9 +238,10 @@ void *reader_func(void *p)
 
 void show_usage(char *cmd)
 {
-    fprintf(stderr, "Usage: \n%s [--b1 [--round N] [--strip] [--adapter devicenumber] [--satellite JCSAT3A|JCSAT4B] channel rectime destfile\n", cmd);
+    fprintf(stderr, "Usage: \n%s [--b1 [--round N] [--strip]] [--adapter index] [--freq 12688] [--satellite JCSAT3A|JCSAT4B] [--pol H|V] [channel] rectime destfile\n", cmd);
     fprintf(stderr, "\n");
     fprintf(stderr, "Remarks:\n");
+    fprintf(stderr, "if freq, satellite and pol are specified, channel is optional\n");
     fprintf(stderr, "if rectime  is '-', records indefinitely.\n");
     fprintf(stderr, "if destfile is '-', stdout is used for output.\n");
 }
@@ -251,6 +254,8 @@ void show_options(void)
     fprintf(stderr, "  --strip:           Strip null stream\n");
     fprintf(stderr, "--adapter N:         Use DVB device /dev/dvb/adapterN\n");
     fprintf(stderr, "--satellite sat:     Specify Satellite to use (JCSAT3A, JCSAT4B)\n");
+    fprintf(stderr, "--pol polarity:      Specify polarity for tune (H or V)\n");
+    fprintf(stderr, "--freq frequency:    Specify frequency for tune (ex. 12688)\n");
     fprintf(stderr, "--help:              Show this help\n");
     fprintf(stderr, "--version:           Show version\n");
 }
@@ -321,6 +326,33 @@ void init_signal_handlers(pthread_t *signal_thread, thread_data *tdata)
     pthread_create(signal_thread, NULL, process_signals, tdata);
 }
 
+static int parse_polarity(const char pol)
+{
+    switch (toupper(pol)) {
+        case 'H':
+            return 0;
+            break;
+
+        case 'V':
+            return 1;
+            break;
+    }
+
+    /* Error */
+    return -1;
+}
+
+static int parse_satellite(const char *sat)
+{
+    if (strcasecmp(sat, "JCSAT4B") == 0)
+        return 1; /* Tone on 124E */
+    else if (strcasecmp(sat, "JCSAT3A") == 0)
+        return 0; /* No tone on 128E */
+
+    /* Error */
+    return -1;
+}
+
 int main(int argc, char **argv)
 {
     time_t cur_time;
@@ -329,6 +361,7 @@ int main(int argc, char **argv)
     QUEUE_T *p_queue = create_queue(MAX_QUEUE);
     BUFSZ *bufptr;
     decoder *decoder = NULL;
+    channel_mask_e mask = CH_NONE;
     static thread_data tdata;
     decoder_options dopt = {
         4,  /* round */
@@ -337,6 +370,8 @@ int main(int argc, char **argv)
     tdata.dopt = &dopt;
     tdata.tfd = -1;
     char *pch = NULL;
+    /* If not enough tuning data is specified, we need "channel name", otherwise, direct tune */
+    int arg_count = 3;
 
     int result;
     int option_index;
@@ -346,6 +381,8 @@ int main(int argc, char **argv)
         { "round",     1, NULL, 'r'},
         { "strip",     0, NULL, 's'},
         { "satellite", 1, NULL, 'l'},
+        { "freq",      1, NULL, 'f'},
+        { "pol",       1, NULL, 'p'},
         { "help",      0, NULL, 'h'},
         { "version",   0, NULL, 'v'},
         {0, 0, NULL, 0} /* terminate */
@@ -357,7 +394,7 @@ int main(int argc, char **argv)
 
     strncpy(chanfile, "/etc/skapa.conf", sizeof(chanfile) - 1);
 
-    while ((result = getopt_long(argc, argv, "a:bc:r:shvl:", long_options, &option_index)) != -1) {
+    while ((result = getopt_long(argc, argv, "a:bc:r:shvl:f:p:", long_options, &option_index)) != -1) {
         switch (result) {
         case 'a':
             dev_num = atoi(optarg);
@@ -369,6 +406,20 @@ int main(int argc, char **argv)
             break;
         case 'c':
             strncpy(chanfile, optarg, sizeof(chanfile) - 1);
+            break;
+        case 'f':
+            /* Get frequency */
+            tdata.freq = strtoul(optarg, NULL, 0);
+            mask |= CH_FREQ;
+            break;
+        case 'p':
+            /* Get polarity */
+            tdata.polarity = parse_polarity(optarg[0]);
+            if (tdata.polarity < 0) {
+                fprintf(stderr, "Invalid argument (%s) for --pol, must be either H or V\n", optarg);
+                exit(-1);
+            }
+            mask |= CH_POL;
             break;
         case 's':
             dopt.strip = true;
@@ -388,8 +439,13 @@ int main(int argc, char **argv)
             exit(0);
             break;
         case 'l':
-            // TODO make this work
-            fprintf(stderr, " Using satellite %s (not actually implemented, use the T option in channels.conf)\n", optarg);
+            /* Get tone (actually satellite name) */
+            tdata.tone = parse_satellite(optarg);
+            if (tdata.tone < 0) {
+                fprintf(stderr, "Invalid argument (%s) for --satellite, must be either 'JCSAT4B' or 'JCSAT3A'\n", optarg);
+                exit(-2);
+            }
+            mask |= CH_TONE;
             break;
         case 'r':
             dopt.round = atoi(optarg);
@@ -398,7 +454,13 @@ int main(int argc, char **argv)
         }
     }
 
-    if (argc - optind < 3) {
+    /* Check if we have enough stuff to tune directly */
+    if (mask == CH_ALL) {
+        fprintf(stderr, "All tuning info provided, not using channel name\n");
+        arg_count = 2;
+    }
+
+    if (argc - optind < arg_count) {
         fprintf(stderr, "Some required parameters are missing!\n");
         fprintf(stderr, "Try '%s --help' for more information.\n", argv[0]);
         return 1;
@@ -406,8 +468,11 @@ int main(int argc, char **argv)
 
     fprintf(stderr, "pid = %d\n", getpid());
 
-    if (pch == NULL)
+    /* If we're here, the next argument is channel name, or else hacky? decrease optind */
+    if (arg_count == 3)
         pch = argv[optind];
+    else
+        optind--;
 
     /* tune */
     if (tune(pch, &tdata, dev_num) != 0)

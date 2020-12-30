@@ -17,10 +17,11 @@ with mirakurun.
 - Modify file writing in single blocks (was chunked for http/udp)
 - Added configuring tone/voltage to switch JCSAT3A/4B satellites
 - Added external channel configuration file instead of hardcoding transponders/services
+- Added setting frequency, tone and polarization from command line to avoid duplicating data inside channels.conf
 
 - original - [http://cgi1.plala.or.jp/~sat/](http://cgi1.plala.or.jp/~sat/)
 
-## How to use
+## How to use (updated)
 
 - See `--help`
 
@@ -29,10 +30,14 @@ with mirakurun.
 - name: TBS6903(A)
   types:
     - SKY
-  command: recskapa -c /usr/local/etc/skapa.conf -a 0 -l <satelite> -b -s <channel> - -
+  command: recskapa -a 0 -l <satellite> -f <freq> -p <polarity> -b -s - -
 ```
 
- - Note, -l <satelite> parameter is currently ignored (satellite selection is done by channel config file, below
+ - Note, it's still possible to use channel configuration file below, but not required as all tuning details are now provided inside channels.yml.
+ - To use channels config, add -c /path/to/channel.conf, omit -l, -f , -p arguments and call the command like so:
+ ```
+  recskapa -c /path/to/channel.conf -a 0 -b -s <channel> - -
+ ```
  
  ## Channel configuration
  

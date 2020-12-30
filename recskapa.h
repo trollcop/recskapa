@@ -21,11 +21,27 @@ typedef struct _QUEUE_T
     BUFSZ *buffer[1];           // buffers
 } QUEUE_T;
 
+/* This is used to determine if all tuning details are specified on command line, thus not needing a channel file */
+typedef enum channel_mask_e
+{
+    CH_NONE = 0,
+    CH_FREQ = 1 << 0,
+    CH_POL = 1 << 1,
+    CH_TONE = 1 << 2,
+    CH_ALL = 0x7
+
+} channel_mask_e;
+
 typedef struct thread_data
 {
     int tfd;    /* tuner fd */
     int wfd;    /* output file fd */
     time_t start_time;
+
+    /* tuning data passed from main thread when not using channel file */
+    int freq;
+    int polarity;
+    int tone;
 
     int recsec;
 

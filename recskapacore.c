@@ -75,8 +75,17 @@ void calc_cn(void)
 
 int parse_time(char *rectimestr, int *recsec)
 {
+    /* check args */
+    if (!recsec)
+        return 1;
+
     /* indefinite */
-    if (!strcmp("-", rectimestr)) {
+    if (!rectimestr) {
+        /* null rectime, definitely infinite */
+        *recsec = -1;
+        return 0;
+    } else if (!strcmp("-", rectimestr)) {
+        /* - as rectime, infinite per spec */
         *recsec = -1;
         return 0;
     } else if (strchr(rectimestr, ':')) {
@@ -293,9 +302,25 @@ int tune(char *channel, thread_data *tdata, int dev_num)
     struct pollfd pfd[1];
     char device[32];
 
-    if (!read_channels(chanfile, channel, &ifreq, &polarity, &tone, &symbol_rate, &delsys)) {
-        fprintf(stderr, "Channel %s not found\n", channel);
-        return 1;
+    /* When not using channel file, tdata contains enough info to tune Skapa */
+    if (channel == NULL) {
+        ifreq = tdata->freq;
+        polarity = tdata->polarity;
+        tone = tdata->tone;
+        symbol_rate = 23303000;
+        delsys = SYS_DVBS2;
+
+        /* Hack for skapa promo channel only */
+        if (ifreq == 12628 && polarity == 1 && tone == 0) {
+            /* JCSAT 3A 12628V 21096 promo channel */
+            delsys = SYS_DVBS;
+            symbol_rate = 21096000;
+        }
+    } else {
+        if (!read_channels(chanfile, channel, &ifreq, &polarity, &tone, &symbol_rate, &delsys)) {
+            fprintf(stderr, "Channel %s not found\n", channel);
+            return 1;
+        }
     }
 
     /* open tuner */
