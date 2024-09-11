@@ -403,7 +403,8 @@ int tune(char *channel, thread_data *tdata, int dev_num)
     else
         prop[1].u.data = ifreq * 1000;
 
-    fprintf(stderr, "Tuning to %.3f MHz\n", prop[1].u.data / 1000000.0f);
+    /* satellite uses kHz, terrestrial uses Hz */
+    fprintf(stderr, "Tuning to %.3f MHz\n", prop[1].u.data / ((!tdata->hikari) ? 1000.0f : 1000000.0f));
     /* Modulation */
     if (!tdata->hikari)
         prop[2].u.data = (delsys == SYS_DVBS) ? QPSK : PSK_8;
