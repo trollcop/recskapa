@@ -4,10 +4,9 @@ Based on recdvb from http://cgi1.plala.or.jp/~sat/
 
 ## Description
 
-recskapa - command to record DVB-S/S2 from linux DVB devices, designed
-specifically for domestic SkyPerfecTV service. Integrates support for
-ARIB-STD-B1 decoding via libpcsclite. Only tested on command line and 
-with mirakurun.
+recskapa - command to record DVB-S/S2 and QAM256 from linux DVB devices, designed
+specifically for domestic SkyPerfecTV and SkyPerfecTV Hikari service. Integrates support for
+ARIB-STD-B1 decoding via libpcsclite. Only tested on command line and with mirakurun.
 
 ## Difference from original?
 
@@ -18,8 +17,9 @@ with mirakurun.
 - Added configuring tone/voltage to switch JCSAT3A/4B satellites
 - Added external channel configuration file instead of hardcoding transponders/services
 - Added setting frequency, tone and polarization from command line to avoid duplicating data inside channels.conf
+- Added support for SkyPerfecTV Hikari tuning (DVB-C Annex B / J.83B)
 
-- original - [http://cgi1.plala.or.jp/~sat/](http://cgi1.plala.or.jp/~sat/)
+- original - [http://cgi1.plala.or.jp/~sat/](http://cgi1.plala.or.jp/~sat/) (link dead as of September 2024)
 
 ## How to use (updated)
 
@@ -31,17 +31,26 @@ with mirakurun.
   types:
     - SKY
   command: recskapa -a 0 -l <satellite> -f <freq> -p <polarity> -b -s - -
+
+- name: TBS6209SE(A)
+  types:
+    - SKY
+  command: recskapa -a 0 -f <freq> -b -s - -
 ```
 
- - Note, it's still possible to use channel configuration file below, but not required as all tuning details are now provided inside channels.yml.
+ - Note, SkyPerfecTV Hikari places all 20 transponders in VHF/UHF frequency range between 112.8 and 587.3 MHz. Main NIT can be obtained by tuning
+   64-QAM DVB-C channel at 375 MHz and doing NIT scanning.
+ - Note, it's still possible to use channel configuration file below, but not required for either satellite or hikari service as all tuning details are now provided inside channels.yml.
  - To use channels config, add -c /path/to/channel.conf, omit -l, -f , -p arguments and call the command like so:
  ```
   recskapa -c /path/to/channel.conf -a 0 -b -s <channel> - -
  ```
+ - Note, channel.conf is not supported for hikari service.
  
  ## Channel configuration
  
  - See included `skapa.conf`
+ - Not required when tuning Skapa Hikari
  
  ```
 # JCSAT 4B    (124) Tone
