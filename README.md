@@ -35,7 +35,7 @@ ARIB-STD-B1 decoding via libpcsclite. Only tested on command line and with mirak
 - name: TBS6209SE(A)
   types:
     - SKY
-  command: recskapa -a 0 -f <freq> -b -s - -
+  command: recskapa -i -a 0 -f <freq> -b -s - -
 ```
 
  - Note, SkyPerfecTV Hikari places all 20 transponders in VHF/UHF frequency range between 112.8 and 587.3 MHz. Main NIT can be obtained by tuning
