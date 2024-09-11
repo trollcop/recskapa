@@ -42,6 +42,7 @@ typedef struct thread_data
     int freq;
     int polarity;
     int tone;
+    bool hikari;
 
     int recsec;
 

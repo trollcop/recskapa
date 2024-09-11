@@ -253,6 +253,7 @@ void show_options(void)
     fprintf(stderr, "  --round N:         Specify round number\n");
     fprintf(stderr, "  --strip:           Strip null stream\n");
     fprintf(stderr, "--adapter N:         Use DVB device /dev/dvb/adapterN\n");
+    fprintf(stderr, "--hikari:            Tune using Skapa Hikari service (J83.B)\n");
     fprintf(stderr, "--satellite sat:     Specify Satellite to use (JCSAT3A, JCSAT4B)\n");
     fprintf(stderr, "--pol polarity:      Specify polarity for tune (H or V)\n");
     fprintf(stderr, "--freq frequency:    Specify frequency for tune (ex. 12688)\n");
@@ -362,7 +363,7 @@ int main(int argc, char **argv)
     BUFSZ *bufptr;
     decoder *decoder = NULL;
     channel_mask_e mask = CH_NONE;
-    static thread_data tdata;
+    static thread_data tdata = { 0, };
     decoder_options dopt = {
         4,  /* round */
         0,  /* strip */
@@ -384,6 +385,7 @@ int main(int argc, char **argv)
         { "freq",      1, NULL, 'f'},
         { "pol",       1, NULL, 'p'},
         { "help",      0, NULL, 'h'},
+        { "hikari",    0, NULL, 'i'},
         { "version",   0, NULL, 'v'},
         {0, 0, NULL, 0} /* terminate */
     };
@@ -394,7 +396,7 @@ int main(int argc, char **argv)
 
     strncpy(chanfile, "/etc/skapa.conf", sizeof(chanfile) - 1);
 
-    while ((result = getopt_long(argc, argv, "a:bc:r:shvl:f:p:", long_options, &option_index)) != -1) {
+    while ((result = getopt_long(argc, argv, "a:bc:r:shivl:f:p:", long_options, &option_index)) != -1) {
         switch (result) {
         case 'a':
             dev_num = atoi(optarg);
@@ -433,6 +435,11 @@ int main(int argc, char **argv)
             fprintf(stderr, "\n");
             exit(0);
             break;
+        case 'i':
+            fprintf(stderr, "Using hikari mode.\n");
+            tdata.hikari = true;
+            break;
+
         case 'v':
             fprintf(stderr, "%s %s\n", argv[0], version);
             fprintf(stderr, "recorder command for DVB tuner.\n");
@@ -455,9 +462,16 @@ int main(int argc, char **argv)
     }
 
     /* Check if we have enough stuff to tune directly */
-    if (mask == CH_ALL) {
-        fprintf(stderr, "All tuning info provided, not using channel name\n");
-        arg_count = 2;
+    if (!tdata.hikari) {
+        if (mask == CH_ALL) {
+            fprintf(stderr, "All tuning info provided, not using channel name\n");
+            arg_count = 2;
+        }
+    } else {
+        if ((mask & CH_FREQ) == CH_FREQ) {
+            /* for hikari all we need is frequency */
+            arg_count = 2;
+        }
     }
 
     if (argc - optind < arg_count) {
@@ -528,7 +542,7 @@ int main(int argc, char **argv)
     tdata.signal_thread = signal_thread;
     pthread_create(&reader_thread, NULL, reader_func, &tdata);
 
-    fprintf(stderr, "\nRecording...\n");
+    fprintf(stderr, "Recording...\n");
 
     time(&tdata.start_time);
 

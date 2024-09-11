@@ -68,9 +68,40 @@ int close_tuner(thread_data *tdata)
 
 void calc_cn(void)
 {
-      int strength=0;
-      ioctl(fefd, FE_READ_SNR, &strength);
-      fprintf(stderr,"SNR: %d\n",strength);
+    unsigned int lvl_scale = 0, snr_scale = 0;
+    float lvl = 0.0f, snr = 0.0f;
+    struct dtv_property p[2];
+    p[0].cmd = DTV_STAT_SIGNAL_STRENGTH;
+    p[1].cmd = DTV_STAT_CNR;
+    struct dtv_properties p_status = { .num = 2, .props = p };
+
+    ioctl(fefd, FE_GET_PROPERTY, &p_status);
+
+    lvl_scale = p_status.props[0].u.st.stat[0].scale;
+    if (lvl_scale == FE_SCALE_DECIBEL) {
+        lvl = p_status.props[0].u.st.stat[0].svalue * 0.001f;
+    } else {
+        int lvl_int;
+        if (ioctl(fefd, FE_READ_SIGNAL_STRENGTH, &lvl_int) == -1) {
+            lvl = 0;
+        } else {
+            lvl = (lvl_int * 100) / 0xffff;
+            if (lvl < 0)
+                lvl = 0.0f;
+        }
+    }
+    snr_scale = p_status.props[1].u.st.stat[0].scale;
+    if (snr_scale == FE_SCALE_DECIBEL) {
+        snr = p_status.props[1].u.st.stat[0].svalue * .001f;
+    } else {
+        unsigned int snr_int = 0;
+        if (ioctl(fefd, FE_READ_SNR, &snr_int) == -1)
+            snr = 0;
+        else
+            snr = snr_int;
+    }
+
+    fprintf(stderr, "RF Level: %2.1f dBm SNR: %2.1f dB\n", lvl, snr);
 }
 
 int parse_time(char *rectimestr, int *recsec)
@@ -279,15 +310,15 @@ int tune(char *channel, thread_data *tdata, int dev_num)
     int modulation = -1;
 
     struct dtv_property prop[] = {
-            {.cmd = DTV_DELIVERY_SYSTEM,   .u.data = delsys },
-            {.cmd = DTV_FREQUENCY,         .u.data = ifreq },
-            {.cmd = DTV_MODULATION,        .u.data = modulation },
-            {.cmd = DTV_SYMBOL_RATE,       .u.data = symbol_rate },
-            {.cmd = DTV_INNER_FEC,         .u.data = FEC_AUTO },
-            {.cmd = DTV_INVERSION,         .u.data = INVERSION_AUTO },
-            {.cmd = DTV_ROLLOFF,           .u.data = ROLLOFF_35 },
-            {.cmd = DTV_PILOT,             .u.data = PILOT_AUTO },
-            {.cmd = DTV_TUNE },
+        {.cmd = DTV_DELIVERY_SYSTEM,   .u.data = delsys },
+        {.cmd = DTV_FREQUENCY,         .u.data = ifreq },
+        {.cmd = DTV_MODULATION,        .u.data = modulation },
+        {.cmd = DTV_SYMBOL_RATE,       .u.data = symbol_rate },
+        {.cmd = DTV_INNER_FEC,         .u.data = FEC_AUTO },
+        {.cmd = DTV_INVERSION,         .u.data = INVERSION_AUTO },
+        {.cmd = DTV_ROLLOFF,           .u.data = ROLLOFF_35 },
+        {.cmd = DTV_PILOT,             .u.data = PILOT_AUTO },
+        {.cmd = DTV_TUNE },
     };
 
     struct dtv_properties cmdseq = {
@@ -305,16 +336,22 @@ int tune(char *channel, thread_data *tdata, int dev_num)
     /* When not using channel file, tdata contains enough info to tune Skapa */
     if (channel == NULL) {
         ifreq = tdata->freq;
-        polarity = tdata->polarity;
-        tone = tdata->tone;
-        symbol_rate = 23303000;
-        delsys = SYS_DVBS2;
+        if (!tdata->hikari) {
+            polarity = tdata->polarity;
+            tone = tdata->tone;
+            symbol_rate = 23303000;
+            delsys = SYS_DVBS2;
 
-        /* Hack for skapa promo channel only */
-        if (ifreq == 12628 && polarity == 1 && tone == 0) {
-            /* JCSAT 3A 12628V 21096 promo channel */
-            delsys = SYS_DVBS;
-            symbol_rate = 21096000;
+            /* Hack for skapa promo channel only */
+            if (ifreq == 12628 && polarity == 1 && tone == 0) {
+                /* JCSAT 3A 12628V 21096 promo channel */
+                delsys = SYS_DVBS;
+                symbol_rate = 21096000;
+            }
+        } else {
+            /* J83.B hikari tv settings */
+            symbol_rate = 5600000;
+            delsys = SYS_DVBC_ANNEX_B;
         }
     } else {
         if (!read_channels(chanfile, channel, &ifreq, &polarity, &tone, &symbol_rate, &delsys)) {
@@ -339,28 +376,48 @@ int tune(char *channel, thread_data *tdata, int dev_num)
         fprintf(stderr, "FE_GET_INFO failed\n");
         return 1;
     }
-    if (fe_info.type != FE_QPSK) {
-        fprintf(stderr, "type is not supported\n");
-        return 1;
+
+    if (!tdata->hikari) {
+        /* check if at least QPSK is supported, means most likely DVB-S/S2 card */
+        if ((fe_info.caps & FE_CAN_QPSK) == 0) {
+            fprintf(stderr, "Frontend does not support QPSK\n");
+            return 1;
+        }
+    } else {
+        /* check if we support QAM256 */
+        if ((fe_info.caps & FE_CAN_QAM_256) == 0) {
+            fprintf(stderr, "Frontend does not support QAM\n");
+            return 1;
+        }
     }
 
     fprintf(stderr, "Using DVB card \"%s\"\n", fe_info.name);
 
-    // configure tune properties
+    /* configure tune properties */
 
-    // Delivery System
+    /* Delivery System */
     prop[0].u.data = delsys;
-    // Frequency
-    prop[1].u.data = (ifreq - SKAPA_LO) * 1000;
-    fprintf(stderr, "Tuning to %d MHz\n", prop[1].u.data / 1000);
-    // Modulation
-    prop[2].u.data = delsys == SYS_DVBS ? QPSK : PSK_8;
-    // Symbol Rate
+    /* Frequency */
+    if (!tdata->hikari)
+        prop[1].u.data = (ifreq - SKAPA_LO) * 1000;
+    else
+        prop[1].u.data = ifreq * 1000;
+
+    fprintf(stderr, "Tuning to %.3f MHz\n", prop[1].u.data / 1000000.0f);
+    /* Modulation */
+    if (!tdata->hikari)
+        prop[2].u.data = (delsys == SYS_DVBS) ? QPSK : PSK_8;
+    else
+        prop[2].u.data = QAM_256;
+    /* Symbol Rate */
     prop[3].u.data = symbol_rate;
 
-    if (!dvb_voltage_tone(fefd, polarity, tone)) {
-        fprintf(stderr, "Error setting voltage/tone\n");
-        return 1;
+    /* tone, not needed for hikari */
+    if (!tdata->hikari) {
+        if (!dvb_voltage_tone(fefd, polarity, tone)) {
+            fprintf(stderr, "Error setting voltage/tone\n");
+            return 1;
+        }
     }
 
     if (ioctl(fefd, FE_SET_PROPERTY, &cmdseq) == -1) {
@@ -382,7 +439,8 @@ int tune(char *channel, thread_data *tdata, int dev_num)
                         fprintf(stderr, "status = %d\n", rc);
                         fprintf(stderr, "errno = %d\n", errno);
                         return -1;
-                    } else fprintf(stderr, "\nOverflow error, trying again (status = %d, errno = %d)", rc, errno);
+                    } else
+                        fprintf(stderr, "\nOverflow error, trying again (status = %d, errno = %d)", rc, errno);
                 }
             }
         }
