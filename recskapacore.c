@@ -18,8 +18,6 @@
 #include "recskapa.h"
 #include "version.h"
 
-#define SKAPA_LO (11200)
-
 static bool read_channels(char *filename, char *channel, int *freq, int *polarity, int *tone, int *symbol_rate, int *delsys);
 
 /* globals */
@@ -300,7 +298,7 @@ syntax_err:
     return false;
 }
 
-int tune(char *channel, thread_data *tdata, int dev_num)
+int tune(char *channel, thread_data *tdata, int dev_num, int dev_frontend)
 {
     int ifreq = -1;
     int polarity = -1;
@@ -362,7 +360,7 @@ int tune(char *channel, thread_data *tdata, int dev_num)
 
     /* open tuner */
     if (fefd == 0) {
-        sprintf(device, "/dev/dvb/adapter%d/frontend0", dev_num);
+        sprintf(device, "/dev/dvb/adapter%d/frontend%d", dev_num, dev_frontend);
         fefd = open(device, O_RDWR);
         if (fefd < 0) {
             fprintf(stderr, "cannot open frontend device\n");

@@ -238,7 +238,7 @@ void *reader_func(void *p)
 
 void show_usage(char *cmd)
 {
-    fprintf(stderr, "Usage: \n%s [--b1 [--round N] [--strip]] [--adapter index] [--freq 12688] [--satellite JCSAT3A|JCSAT4B] [--pol H|V] [channel] rectime destfile\n", cmd);
+    fprintf(stderr, "Usage: \n%s [--b1 [--round N] [--strip]] [--adapter index] [--frontend index] [--freq 12688] [--satellite JCSAT3A|JCSAT4B] [--pol H|V] [--lo 11200] [channel] rectime destfile\n", cmd);
     fprintf(stderr, "\n");
     fprintf(stderr, "Remarks:\n");
     fprintf(stderr, "if freq, satellite and pol are specified, channel is optional\n");
@@ -249,16 +249,18 @@ void show_usage(char *cmd)
 void show_options(void)
 {
     fprintf(stderr, "Options:\n");
-    fprintf(stderr, "--b1:                Decrypt using SKAPA card\n");
+    fprintf(stderr, "--b1:                Decrypt using SKAPA card [-b]\n");
     fprintf(stderr, "  --round N:         Specify round number\n");
     fprintf(stderr, "  --strip:           Strip null stream\n");
-    fprintf(stderr, "--adapter N:         Use DVB device /dev/dvb/adapterN\n");
-    fprintf(stderr, "--hikari:            Tune using Skapa Hikari service (J83.B)\n");
-    fprintf(stderr, "--satellite sat:     Specify Satellite to use (JCSAT3A, JCSAT4B)\n");
-    fprintf(stderr, "--pol polarity:      Specify polarity for tune (H or V)\n");
-    fprintf(stderr, "--freq frequency:    Specify frequency for tune (ex. 12688)\n");
-    fprintf(stderr, "--help:              Show this help\n");
-    fprintf(stderr, "--version:           Show version\n");
+    fprintf(stderr, "--adapter N:         Use DVB device /dev/dvb/adapterN [-a]\n");
+    fprintf(stderr, "--frontend N:        Use DVB device /dev/dvb/adapterX/frontendN [-n]\n");
+    fprintf(stderr, "--lo N:              Specify satellite LO (default 11200MHz) [-o]\n");
+    fprintf(stderr, "--hikari:            Tune using Skapa Hikari service (J83.B) [-i]\n");
+    fprintf(stderr, "--satellite sat:     Specify Satellite to use (JCSAT3A, JCSAT4B) [-l]\n");
+    fprintf(stderr, "--pol polarity:      Specify polarity for tune (H or V) [-p]\n");
+    fprintf(stderr, "--freq frequency:    Specify frequency for tune (ex. 12688) [-f]\n");
+    fprintf(stderr, "--help:              Show this help [-h]\n");
+    fprintf(stderr, "--version:           Show version [-v]\n");
 }
 
 void cleanup(thread_data *tdata)
@@ -370,6 +372,7 @@ int main(int argc, char **argv)
     };
     tdata.dopt = &dopt;
     tdata.tfd = -1;
+    tdata.lo_freq = SKAPA_LO;
     char *pch = NULL;
     /* If not enough tuning data is specified, we need "channel name", otherwise, direct tune */
     int arg_count = 3;
@@ -378,10 +381,12 @@ int main(int argc, char **argv)
     int option_index;
     struct option long_options[] = {
         { "adapter",   1, NULL, 'a'},
+        { "frontend",  1, NULL, 'n'},
         { "b1",        0, NULL, 'b'},
         { "round",     1, NULL, 'r'},
         { "strip",     0, NULL, 's'},
         { "satellite", 1, NULL, 'l'},
+        { "lo",        1, NULL, 'o'},
         { "freq",      1, NULL, 'f'},
         { "pol",       1, NULL, 'p'},
         { "help",      0, NULL, 'h'},
@@ -393,10 +398,11 @@ int main(int argc, char **argv)
     bool use_b1 = false;
     bool use_stdout = false;
     int dev_num = 0;
+    int dev_frontend = 0;
 
     strncpy(chanfile, "/etc/skapa.conf", sizeof(chanfile) - 1);
 
-    while ((result = getopt_long(argc, argv, "a:bc:r:shivl:f:p:", long_options, &option_index)) != -1) {
+    while ((result = getopt_long(argc, argv, "a:bc:r:shivl:f:p:o:n:", long_options, &option_index)) != -1) {
         switch (result) {
         case 'a':
             dev_num = atoi(optarg);
@@ -414,6 +420,18 @@ int main(int argc, char **argv)
             tdata.freq = strtoul(optarg, NULL, 0);
             mask |= CH_FREQ;
             break;
+	case 'n':
+	    /* Get frontend index */
+            dev_frontend = strtoul(optarg, NULL, 0);
+            fprintf(stderr, "using frontend: %d\n", dev_frontend);
+	    break;
+	case 'o':
+	    /* Get non-standard LO frequency */
+            tdata.lo_freq = strtoul(optarg, NULL, 0);
+	    if (tdata.lo_freq < 9750 || tdata.lo_freq > 10600)
+                tdata.lo_freq = SKAPA_LO; 
+            fprintf(stderr, "using LO of %dMHz\n", tdata.lo_freq);
+	    break;
         case 'p':
             /* Get polarity */
             tdata.polarity = parse_polarity(optarg[0]);
@@ -489,7 +507,7 @@ int main(int argc, char **argv)
         optind--;
 
     /* tune */
-    if (tune(pch, &tdata, dev_num) != 0)
+    if (tune(pch, &tdata, dev_num, dev_frontend) != 0)
         return 1;
 
     /* set recsec */

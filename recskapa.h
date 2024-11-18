@@ -3,6 +3,8 @@
 #define MAX_QUEUE           8192
 #define MAX_READ_SIZE       (188 * 87)
 
+#define SKAPA_LO (11200)
+
 typedef struct _BUFSZ {
     int size;
     uint8_t buffer[MAX_READ_SIZE];
@@ -40,6 +42,7 @@ typedef struct thread_data
 
     /* tuning data passed from main thread when not using channel file */
     int freq;
+    int lo_freq;
     int polarity;
     int tone;
     bool hikari;
@@ -60,7 +63,7 @@ extern char chanfile[256];
 extern bool f_exit;
 
 /* prototypes */
-int tune(char *channel, thread_data *tdata, int dev_num);
+int tune(char *channel, thread_data *tdata, int dev_num, int dev_frontend);
 int close_tuner(thread_data *tdata);
 void calc_cn(void);
 int parse_time(char *rectimestr, int *recsec);
