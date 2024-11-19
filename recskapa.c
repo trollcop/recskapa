@@ -428,7 +428,7 @@ int main(int argc, char **argv)
 	case 'o':
 	    /* Get non-standard LO frequency */
             tdata.lo_freq = strtoul(optarg, NULL, 0);
-	    if (tdata.lo_freq < 9750 || tdata.lo_freq > 10600)
+	    if (tdata.lo_freq < 9750 || tdata.lo_freq > 12750)
                 tdata.lo_freq = SKAPA_LO; 
             fprintf(stderr, "using LO of %dMHz\n", tdata.lo_freq);
 	    break;
