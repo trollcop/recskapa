@@ -397,7 +397,7 @@ int tune(char *channel, thread_data *tdata, int dev_num, int dev_frontend)
     prop[0].u.data = delsys;
     /* Frequency */
     if (!tdata->hikari)
-        prop[1].u.data = (ifreq - SKAPA_LO) * 1000;
+        prop[1].u.data = (ifreq - tdata->lo_freq) * 1000;
     else
         prop[1].u.data = ifreq * 1000;
 
