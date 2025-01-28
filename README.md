@@ -40,8 +40,9 @@ ARIB-STD-B1 decoding via libpcsclite. Only tested on command line and with mirak
 
  - Note, SkyPerfecTV Hikari places all 20 transponders in VHF/UHF frequency range between 112.8 and 587.3 MHz. Main NIT can be obtained by tuning
    64-QAM DVB-C channel at 375 MHz and doing NIT scanning.
- - Note, it's still possible to use channel configuration file below, but not required for either satellite or hikari service as all tuning details are now provided inside channels.yml.
- - To use channels config, add -c /path/to/channel.conf, omit -l, -f , -p arguments and call the command like so:
+ - Some DVB cards have multiple frontends on same adapter, so command line option `-n` (`--frontend`) can be used to select it.
+ - Note, it's still possible to use channel configuration file below, but not required for either satellite or hikari service as all tuning details can be provided on command line directly.
+ - To use channels config, add `-c /path/to/channel.conf`, omit `-i`, `-l`, `-f` , `-p` arguments and call the command like so:
  ```
   recskapa -c /path/to/channel.conf -a 0 -b -s <channel> - -
  ```
